@@ -29,7 +29,40 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
+
+  for i in range(num_train):
+      scores = X[i].dot(W)
+      # achieve numerical stability (avoid overflow)
+      scores -= np.max(scores)
+
+      # construct vector of softmax function for all classes
+      softmax = np.exp(scores) / np.sum(np.exp(scores))
+      loss += -np.log(softmax[y[i]])
+
+      #############################################################################
+      # The gradient of softmax loss L_i = -log(e^(f_{y_i}) / sum_{j} exp^(f_j)   #
+      # is:                                                                       #
+      #    dW = (o_{y_i} - 1) * X[i]     , if with respect to w_{y_i}             #
+      #       = o_k                      , otherwise                              #
+      #                                                                           #
+      #    o : softmax function e^(f_{y_i}) / sum_{j} exp^(f_j)                   #
+      #############################################################################
+      for j in range(num_classes):
+          if j == y[i]:
+              dW[:, y[i]] += (softmax[y[i]]- 1) * X[i]
+          else:
+              dW[:, j] += softmax[j] * X[i]
+
+  loss /= num_train
+  dW /= num_train
+
+  # reguliarzation loss
+  loss += reg * np.sum(W * W)
+  dW += 2 * reg * W
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -53,7 +86,30 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
+
+  scores = X.dot(W)
+  # achieve numerical stability (avoid overflow)
+  scores -= np.max(scores, axis=1, keepdims=True)
+
+  # construct softmax vector of softmax function for all classes
+  # The parameter 'keepdims' in np.sum() is left in the result as dimensions with size one
+  softmax = np.exp(scores) / np.sum(np.exp(scores), axis=1, keepdims=True)
+  loss = np.sum(-np.log(softmax[np.arange(num_train), y]))
+  loss /= num_train
+  loss += reg * np.sum(W * W)
+
+  # Shallow explaination:
+  # All X[i, j]*softmax[j] contribute to dW[: j], but have a exception.
+  # All X[i, y[i]]*softmax[y[i]] should subtract contribution from one,
+  # because its gradient's form (o_{y_i}-1)
+  softmax[np.arange(num_train), y] += -1
+  dW = X.T.dot(softmax)
+  dW /= num_train
+  dW += 2 * reg * W
+
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
