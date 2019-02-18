@@ -47,7 +47,10 @@ class TwoLayerNet(object):
         # and biases using the keys 'W1' and 'b1' and second layer                 #
         # weights and biases using the keys 'W2' and 'b2'.                         #
         ############################################################################
-        pass
+        self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dim)
+        self.params['b1'] = np.zeros(hidden_dim)
+        self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+        self.params['b2'] = np.zeros(num_classes)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -77,7 +80,13 @@ class TwoLayerNet(object):
         # TODO: Implement the forward pass for the two-layer net, computing the    #
         # class scores for X and storing them in the scores variable.              #
         ############################################################################
-        pass
+        W1, b1 = self.params['W1'], self.params['b1']
+        W2, b2 = self.params['W2'], self.params['b2']
+        N, D = X.shape
+
+        hidden_layer = X.reshape(N, -1).dot(W1) + b1
+        hidden_layer = hidden_layer * (hidden_layer > 0)
+        scores = hidden_layer.dot(W2) + b2
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -97,7 +106,32 @@ class TwoLayerNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+
+        N_array = np.arange(N)
+        scores -= np.max(scores, axis=1, keepdims=True)
+        softmax = np.exp(scores) / np.sum(np.exp(scores), axis=1, keepdims=True)
+        data_loss = np.sum(-np.log(softmax[N_array, y])) / N
+        reg_loss = 0.5 * self.reg * (np.sum(W1 * W1) + np.sum(W2 * W2))
+        loss = data_loss + reg_loss
+
+        dscores = softmax
+        dscores[N_array, y] += -1
+        dscores /= N
+
+        dhidden = dscores.dot(W2.T)
+        dW2 = hidden_layer.T.dot(dscores)
+        db2 = np.sum(dscores, axis=0)
+
+        dhidden[hidden_layer <= 0] = 0
+        dW1 = X.T.dot(dhidden)
+        db1 = np.sum(dhidden, axis=0)
+
+        dW2 += self.reg * W2
+        dW1 += self.reg * W1
+
+        grads['W1'], grads['b1'] = dW1, db1
+        grads['W2'], grads['b2'] = dW2, db2
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

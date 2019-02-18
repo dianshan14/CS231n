@@ -94,6 +94,7 @@ class TwoLayerNet(object):
     # classifier loss.                                                          #
     #############################################################################
 
+    scores -= np.max(scores, axis=1, keepdims=True)
     softmax = np.exp(scores) / np.sum(np.exp(scores), axis=1, keepdims=True)
     data_loss = np.sum(-np.log(softmax[np.arange(N), y])) / N
     reg_loss = 0.5 * reg * np.sum(W1 * W1) + 0.5 * reg * np.sum(W2 * W2)
