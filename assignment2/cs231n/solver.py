@@ -161,6 +161,7 @@ class Solver(object):
         self.val_acc_history = []
 
         # Make a deep copy of the optim_config for each parameter
+        # optim_configs[parameter_key][config_key]
         self.optim_configs = {}
         for p in self.model.params:
             d = {k: v for k, v in self.optim_config.items()}
@@ -275,6 +276,9 @@ class Solver(object):
             epoch_end = (t + 1) % iterations_per_epoch == 0
             if epoch_end:
                 self.epoch += 1
+                # decay the learning rate for each parameter(such as W1, W2, b1, b2...)
+                # 'optim_configs' be used in optim.py
+                # optim_configs[parameter_key][config_key] = config_value
                 for k in self.optim_configs:
                     self.optim_configs[k]['learning_rate'] *= self.lr_decay
 
