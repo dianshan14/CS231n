@@ -344,7 +344,18 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # transformations you could perform, that would enable you to copy over   #
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
-    pass
+    # HINT: Perform transpose on x at beginneing, and, at last, perfrom transpose on x_hat too
+    #       before assign the matrix to 'out'
+    x = x.T
+    bn_mean = np.mean(x, axis=0)
+    bn_var = np.mean((x - bn_mean)**2, axis=0)
+    x_hat = (x - bn_mean) / np.sqrt(bn_var + eps)
+    x_hat = x_hat.T
+    # 'gamma * x_hat + beta' did not change their shape whatever using batch or layer normalization
+    # when using batch_norm backward code
+    out = gamma * x_hat + beta
+
+    cache = gamma, x_hat, bn_var, eps, bn_mean, x
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -375,7 +386,42 @@ def layernorm_backward(dout, cache):
     # implementation of batch normalization. The hints to the forward pass    #
     # still apply!                                                            #
     ###########################################################################
-    pass
+    # Due to following HINT above:(when using batch_norm code)
+    gamma, x_hat, bn_var, eps, bn_mean, x = cache
+
+    # Whatever batch or layer norm, these matrics/vectors(in chche) did not change their shape.
+    # dout: (N, D)
+    # gamma: (D, ) apply on (N, D) matrix
+    dx_hat = dout * gamma # (N, D)
+    dgamma = np.sum(dout * x_hat, axis=0) # (D, )
+    dbeta = np.sum(dout, axis=0) # (D, )
+
+    ############################################################################################
+
+    # These matrics/vectors(in cache) would vary their shape with different normalization.
+    # x_hat: (D, N) (transposed at forward pass)
+    # bn_var: (N, ) (layer_norm) (layer_norm, if batch_norm, this size would be (D, ))
+    # bn_mean: (N, ) (layer_norm, if batch_norm, this size would be (D, ))
+
+    # swap the size assigned to (N, D) because of using code copied from batch_norm backward
+    D, N = dout.shape
+
+    # transpose dx_hat because of copying code from batch_norm backward
+    # (D, N)
+    dx_hat = dx_hat.T
+
+    var_div = -1 / (2 * (bn_var + eps)**(3/2))
+    dbn_var =  var_div * np.sum(dx_hat * (x - bn_mean), axis=0)
+
+    sqrt_var = 1 / np.sqrt(bn_var + eps)
+    dbn_mean = -sqrt_var * np.sum(dx_hat, axis=0)
+    dbn_mean += -2 * dbn_var * np.sum(x - bn_mean, axis=0) / N
+
+    dx = sqrt_var * dx_hat
+    dx += 2 * dbn_var * (x - bn_mean) / N
+    dx += dbn_mean / N
+
+    dx = dx.T
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
