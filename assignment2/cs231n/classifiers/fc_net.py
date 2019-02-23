@@ -270,16 +270,18 @@ class FullyConnectedNet(object):
             W = self.params[w_layer]
             b = self.params[b_layer]
 
-            # affine-bn-relu
             if self.normalization=='batchnorm':
+                # affine-bn-relu
                 gamma_layer, beta_layer = 'gamma' + str(l), 'beta' + str(l)
                 gamma = self.params[gamma_layer]
                 beta = self.params[beta_layer]
                 out, cache[str(l)] = affine_bn_relu_forward(out, W, b, gamma, beta, self.bn_params[i])
-                continue
+            else:
+                # affine-relu
+                out, cache[str(l)] = affine_relu_forward(out, W, b)
 
-            # affine-relu
-            out, cache[str(l)] = affine_relu_forward(out, W, b)
+            if self.use_dropout:
+                out, cache['d'+str(l)] = dropout_forward(out, self.dropout_param)
 
         last_layer = str(self.num_layers)
         W = self.params['W'+last_layer]
@@ -325,15 +327,18 @@ class FullyConnectedNet(object):
         din, grads['W'+last_layer], grads['b'+last_layer] = affine_backward(dloss, cache[last_layer])
         grads['W'+last_layer] += self.reg * self.params['W'+last_layer]
         for l in range(self.num_layers-1, 0, -1):
+
+            # because of backward, dropout should be proped which was earlier than other layers.
+            if self.use_dropout:
+                din = dropout_backward(din, cache['d'+str(l)])
+
             w_layer, b_layer = 'W' + str(l), 'b' + str(l)
 
             if self.normalization=='batchnorm':
                 gamma_layer, beta_layer = 'gamma' + str(l), 'beta' + str(l)
                 din, grads[w_layer], grads[b_layer], grads[gamma_layer], grads[beta_layer] = affine_bn_relu_backward(din, cache[str(l)])
-                grads[w_layer] += self.reg * self.params[w_layer]
-                continue
-
-            din, grads[w_layer], grads[b_layer] = affine_relu_backward(din, cache[str(l)])
+            else:
+                din, grads[w_layer], grads[b_layer] = affine_relu_backward(din, cache[str(l)])
             grads[w_layer] += self.reg * self.params[w_layer]
 
         ############################################################################
