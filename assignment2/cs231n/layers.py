@@ -386,7 +386,7 @@ def layernorm_backward(dout, cache):
     # implementation of batch normalization. The hints to the forward pass    #
     # still apply!                                                            #
     ###########################################################################
-    # Due to following HINT above:(when using batch_norm code)
+    # Due to following HINT above:(when using batch_norm code here)
     gamma, x_hat, bn_var, eps, bn_mean, x = cache
 
     # Whatever batch or layer norm, these matrics/vectors(in chche) did not change their shape.
@@ -767,6 +767,7 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
 
     N, C, H, W = x.shape
 
+    # normalize on per feature map
     x_tmp = np.transpose(x, (0, 2, 3, 1)).reshape(-1, C)
     out, cache = batchnorm_forward(x_tmp, gamma, beta, bn_param)
     out = out.reshape(N, H, W, C).transpose(0, 3, 1, 2)
@@ -802,6 +803,7 @@ def spatial_batchnorm_backward(dout, cache):
     ###########################################################################
     N, C, H, W = dout.shape
 
+    # normalize on per feature map
     dout_tmp = np.transpose(dout, (0, 2, 3, 1)).reshape(-1, C)
     dx, dgamma, dbeta = batchnorm_backward(dout_tmp, cache)
     dx = dx.reshape(N, H, W, C).transpose(0, 3, 1, 2)
@@ -834,6 +836,7 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     """
     out, cache = None, None
     eps = gn_param.get('eps',1e-5)
+
     ###########################################################################
     # TODO: Implement the forward pass for spatial group normalization.       #
     # This will be extremely similar to the layer norm implementation.        #
@@ -841,7 +844,20 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # the bulk of the code is similar to both train-time batch normalization  #
     # and layer normalization!                                                #
     ###########################################################################
-    pass
+    # good Chinese reference
+    # https://zhuanlan.zhihu.com/p/35005794
+
+    N, C, H, W = x.shape
+    # transform the matrix, and normalize along (C//G, H, W) dimensions
+    x_group = x.reshape(N, G, C//G, H, W)
+    mean_group = np.mean(x_group, axis=(2, 3, 4), keepdims=True)
+    var_group = np.mean((x_group - mean_group)**2, axis=(2, 3, 4), keepdims=True)
+    x_group_hat = (x_group - mean_group) / np.sqrt(var_group + eps)
+
+    x_hat = x_group_hat.reshape(N, C, H, W)
+    out = gamma * x_hat + beta
+
+    cache = gamma, x_hat, var_group, eps, mean_group, x_group, G
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -867,7 +883,30 @@ def spatial_groupnorm_backward(dout, cache):
     # TODO: Implement the backward pass for spatial group normalization.      #
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
-    pass
+    gamma, x_hat, var_group, eps, mean_group, x_group, G = cache
+    N, C, H, W = dout.shape
+
+    dgamma = np.sum(dout * x_hat, axis=(0, 2, 3), keepdims=True)
+    dbeta = np.sum(dout, axis=(0, 2, 3), keepdims=True)
+
+    dx_hat = dout * gamma
+
+    dx_group_hat = dx_hat.reshape(N, G, C//G, H, W)
+
+    var_div = -1 / (2 * (var_group + eps)**(3/2))
+    dvar_group =  var_div * np.sum(dx_group_hat * (x_group - mean_group), axis=(2, 3, 4), keepdims=True)
+
+    N_group = (C//G) * H * W
+    sqrt_var = 1 / np.sqrt(var_group + eps)
+    dmean_group = -sqrt_var * np.sum(dx_group_hat, axis=(2, 3, 4), keepdims=True)
+    dmean_group += -2 * dvar_group * np.sum(x_group - mean_group, axis=(2, 3, 4), keepdims=True) / N_group
+
+    dx_group = sqrt_var * dx_group_hat
+    dx_group += 2 * dvar_group * (x_group - mean_group) / N_group
+    dx_group += dmean_group / N_group
+
+    dx = dx_group.reshape(N, C, H, W)
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
