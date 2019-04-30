@@ -546,6 +546,9 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
+    # reference
+    # https://becominghuman.ai/back-propagation-in-convolutional-neural-networks-intuition-and-code-714ef1c38199
+
     # dot product betweeen entries of the filter and the input at any position
     # stack these activation map along the depth dimension and produce the output volumn
 
